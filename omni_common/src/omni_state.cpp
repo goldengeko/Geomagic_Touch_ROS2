@@ -172,8 +172,8 @@ public:
             RCLCPP_WARN(node_->get_logger(), "Unknown units [%s] unsing [mm]", units.c_str());
             units = "mm";
         }
-        RCLCPP_INFO(node_->get_logger(), "PHaNTOM position given in [%s], ratio [%.1f]", units.c_str(), state->units_ratio);
-        RCLCPP_INFO(rclcpp::get_logger("omni_haptic_node"), "Publishing PHaNTOM state at [%d] Hz", publish_rate);
+        RCLCPP_INFO(node_->get_logger(), "Phantom position given in [%s], ratio [%.1f]", units.c_str(), state->units_ratio);
+        RCLCPP_INFO(rclcpp::get_logger("omni_haptic_node"), "Publishing Phantom state at [%d] Hz", publish_rate);
         pub_timer = node_->create_wall_timer(std::chrono::seconds(1/publish_rate), std::bind(&PhantomROS::publish_omni_state, this));
     }
 

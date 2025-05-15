@@ -20,7 +20,7 @@ public:
 private:
     void init() {
         framename_ = declare_parameter<std::string>("framename", "frame");
-        parent_frame_ = declare_parameter<std::string>("parent_frame", "base_link");
+        parent_frame_ = declare_parameter<std::string>("parent_frame", "base");
         timer_period_ms_ = declare_parameter<int>("timer_period_ms", 100);
         enable_verbose_logging_ = declare_parameter<bool>("verbose_logging", false);
 
