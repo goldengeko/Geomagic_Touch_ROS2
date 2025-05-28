@@ -52,7 +52,7 @@ class PhantomJointToJog(Node):
         self.prev_pose = None
         self.prev_positions = None
         self.prev_time = None
-        self.max_rate = 1.5  # rad/s
+        self.max_rate = 1.5 # rad/s
         self.alpha = 0.003 # low pass filter.reduce for smoother
         self.deadband = 0.01 # rad/s
         self.grey_value = 0.0
@@ -60,6 +60,7 @@ class PhantomJointToJog(Node):
 
         self.filtered_vel = {}
         self.vel_scaling = 10.0  # scaling factor for velocity
+        self.twist_scaling = 5.0  # scaling factor for twist commands
 
         self.get_logger().info("Phantom → JointJog bridge running.")
 
@@ -108,7 +109,6 @@ class PhantomJointToJog(Node):
         axis = axis / axis_norm if axis_norm > 0 else [0.0, 0.0, 0.0]
         wx, wy, wz = (angle * a / dt for a in axis)
 
-        # Apply low-pass filtering
         def lpf(key, raw_value):
             prev = self.filtered_vel.get(key, 0.0)
             filtered = self.alpha * raw_value + (1 - self.alpha) * prev
@@ -124,17 +124,17 @@ class PhantomJointToJog(Node):
 
         twist = TwistStamped()
         twist.header.stamp = now.to_msg()
-        twist.header.frame_id = EEF_FRAME_ID if self.grey_value else BASE_FRAME_ID
+        twist.header.frame_id = BASE_FRAME_ID if self.white_value else EEF_FRAME_ID
 
-        twist.twist.linear.x =  vx*1.5
-        twist.twist.linear.y =  vy*1.5
-        twist.twist.linear.z =  vz*1.5
-        twist.twist.angular.x = wx*1.5
-        twist.twist.angular.y = wy*1.5
-        twist.twist.angular.z = wz*1.5
+        twist.twist.linear.x =  vx*self.twist_scaling
+        twist.twist.linear.y =  vy*self.twist_scaling
+        twist.twist.linear.z =  vz*self.twist_scaling
+        twist.twist.angular.x = wx*self.twist_scaling
+        twist.twist.angular.y = wy*self.twist_scaling
+        twist.twist.angular.z = wz*self.twist_scaling
 
-        # if not self.grey_value and twist.twist.linear.x != 0.0: 
-        #     self.twist_pub.publish(twist)
+        if not self.grey_value and twist.twist.linear.x != 0.0: 
+            self.twist_pub.publish(twist)
 
         self.prev_pose = msg
         self.prev_time = now
@@ -178,8 +178,8 @@ class PhantomJointToJog(Node):
             jog.joint_names.append(joint_key)
             jog.velocities.append(sign * filtered_vel)
 
-        if not self.grey_value and jog.joint_names:
-                self.jog_pub.publish(jog)
+        # if not self.grey_value and jog.joint_names:
+        #         self.jog_pub.publish(jog)
 
         self.prev_positions = dict(zip(msg.name, msg.position))
         self.prev_time = now
