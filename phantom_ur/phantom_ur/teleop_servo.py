@@ -5,6 +5,8 @@ from rclpy.node import Node
 
 from geometry_msgs.msg import TwistStamped
 from control_msgs.msg import JointJog
+from controller_manager_msgs.srv import SwitchController
+from std_srvs.srv import Trigger
 
 import sys
 import tty
@@ -47,6 +49,46 @@ KEY_BINDINGS = {
 class ServoKeyboardInput(Node):
     def __init__(self):
         super().__init__("servo_keyboard_input")
+        # switch to the forward position controller
+        self.switch_client = self.create_client(
+            SwitchController, "/controller_manager/switch_controller"
+        )
+        while not self.switch_client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info(
+                "Waiting for the controller manager switch service to be available..."
+            )
+        self.get_logger().info("Controller manager switch service is available.")
+
+        request = SwitchController.Request()
+        request.start_controllers = ["forward_position_controller"]
+        request.deactivate_controllers = ["scaled_joint_trajectory_controller"]
+        request.strictness = SwitchController.Request.STRICT
+        future = self.switch_client.call_async(request)
+        rclpy.spin_until_future_complete(self, future)
+        if future.result() is None:
+            self.get_logger().error(
+                "Failed to switch controllers: %s" % future.exception()
+            )
+        else:
+            self.get_logger().info("Switched to forward_position_controller.")
+
+        # trigger the servo node to start
+        self.trigger_client = self.create_client(Trigger, "/servo_node/start_servo")
+        while not self.trigger_client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info(
+                "Waiting for the servo node trigger service to be available..."
+            )
+        self.get_logger().info("Servo node trigger service is available.")
+        trigger_request = Trigger.Request()
+        trigger_future = self.trigger_client.call_async(trigger_request)
+        rclpy.spin_until_future_complete(self, trigger_future)
+        if trigger_future.result() is None:
+            self.get_logger().error(
+                "Failed to trigger servo node: %s" % trigger_future.exception()
+            )
+        else:
+            self.get_logger().info("Servo node triggered successfully.")
+
         self.twist_pub = self.create_publisher(TwistStamped, TWIST_TOPIC, 10)
         self.joint_pub = self.create_publisher(JointJog, JOINT_TOPIC, 10)
 
