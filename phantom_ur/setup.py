@@ -20,7 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'teleop_servo =' + package_name + 'teleop_servo:main',
+            'teleop_servo = phantom_ur.teleop_servo:main',
         ],
     },
 )

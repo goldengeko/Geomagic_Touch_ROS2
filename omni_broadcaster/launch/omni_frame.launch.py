@@ -15,7 +15,7 @@ def generate_launch_description():
         # Set an environment variable (optional, specific to your setup)
         SetEnvironmentVariable(
             name="GTDD_HOME",
-            value="/home/fh-aachen/.3dsystems"
+            value="/home/roslab/.3dsystems"
         ),
         
         # Omni state node
