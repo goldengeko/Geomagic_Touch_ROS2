@@ -3,6 +3,7 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
+from std_msgs.msg import Float32
 from control_msgs.msg import JointJog
 from omni_msgs.msg import OmniButtonEvent
 from geometry_msgs.msg import TwistStamped, PoseStamped
@@ -20,8 +21,9 @@ from controller_manager_msgs.srv import ListControllers
 
 # Constants
 TWIST_TOPIC = "/twist_controller/commands"
+GRIPPER_TOPIC = "/twist_controller/gripper_vel"
 EEF_FRAME_ID = "tool_frame"
-BASE_FRAME_ID = "base_link"
+BASE_FRAME_ID = "map"
     
 class PhantomJointToJog(Node):
     def __init__(self):
@@ -31,6 +33,8 @@ class PhantomJointToJog(Node):
             PoseStamped, '/phantom/pose', self.pose_callback, 10)
         self.twist_pub = self.create_publisher(
             TwistStamped, TWIST_TOPIC, 10)
+        self.gripper_pub = self.create_publisher(
+            Float32, GRIPPER_TOPIC, 10)
         self.grey_button_pub = self.create_subscription(
             OmniButtonEvent, '/phantom/button', self.button_callback, 10)
 
@@ -41,60 +45,37 @@ class PhantomJointToJog(Node):
         self.max_rate = 2.0 # rad/s
         self.alpha = 0.005 # low pass filter.reduce for smoother
         self.deadband = 0.01 # rad/s
-        self.grey_value = 0.0
-        self.white_value = 0.0
+        self.grey_value = False
+        self.white_value = False
+        self.gripper_vel = 0.2
 
         self.filtered_vel = {}
-        self.vel_scaling = 2.0  # scaling factor for velocity
-        self.twist_scaling = 5.0  # scaling factor for twist commands
+        self.angular_scaling = 2.0  # scaling factor for velocity
+        self.linear_scaling = 5.0  # scaling factor for twist commands
 
         self.mode = 'pose' 
+        
 
         self.get_logger().info("Phantom → JointJog bridge running in 'pose' mode.")
+        self.timer = self.create_timer(0.001, self.gripper_callback)
 
-        self.keyboard_thread = threading.Thread(target=self.keyboard_listener, daemon=True)
-        self.keyboard_thread.start()
-
-    def keyboard_listener(self):
-        print(
-            """
-Reading from keyboard:
----------------------------
-Use + or - to increase or decrease velocity scaling.
-Use 'p' to switch to 'pose' mode.
-Use 'j' to switch to 'joint' mode.
-Press Ctrl+C to exit.
-"""
-        )
-        fd = sys.stdin.fileno()
-        old_settings = termios.tcgetattr(fd)
-        try:
-            tty.setraw(sys.stdin.fileno())
-            while True:
-                key = sys.stdin.read(1)
-                if key == '+':
-                    self.vel_scaling += 2.0
-                    self.twist_scaling += 1.0
-                    self.get_logger().debug(f"Velocity scaling increased: vel_scaling={self.vel_scaling}, twist_scaling={self.twist_scaling}")
-                elif key == '-':
-                    self.vel_scaling = max(1.0, self.vel_scaling - 1.0)
-                    self.twist_scaling = max(0.5, self.twist_scaling - 0.5)
-                    self.get_logger().debug(f"Velocity scaling decreased: vel_scaling={self.vel_scaling}, twist_scaling={self.twist_scaling}")
-                elif key.lower() == 'p':
-                    self.mode = 'pose'
-                    self.get_logger().info("Switched to 'pose' mode.")
-                elif key.lower() == 'j':
-                    self.mode = 'joint'
-                    self.get_logger().info("Switched to 'joint' mode.")
-                elif key == '\x03':  
-                    break
-        finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
     def button_callback(self, msg: OmniButtonEvent):
+        
         self.grey_value = msg.grey_button
         self.white_value = msg.white_button
 
+    def gripper_callback(self):
+
+        gripper = Float32()
+        if self.grey_value:
+            gripper.data -= self.gripper_vel
+            self.gripper_pub.publish(gripper)
+        else:
+            gripper.data += self.gripper_vel
+            self.gripper_pub.publish(gripper)
+        
+        
     def pose_callback(self, msg: PoseStamped):
         if self.mode != 'pose':
             return  
@@ -154,16 +135,16 @@ Press Ctrl+C to exit.
 
         twist = TwistStamped()
         twist.header.stamp = now.to_msg()
-        twist.header.frame_id = BASE_FRAME_ID if self.white_value else EEF_FRAME_ID
+        twist.header.frame_id = BASE_FRAME_ID
 
-        twist.twist.linear.x = vx * self.twist_scaling
-        twist.twist.linear.y = vy * self.twist_scaling
-        twist.twist.linear.z = vz * self.twist_scaling
-        twist.twist.angular.x = wx * self.twist_scaling
-        twist.twist.angular.y = wy * self.twist_scaling
-        twist.twist.angular.z = wz * self.twist_scaling
+        twist.twist.linear.x = -vx * self.linear_scaling
+        twist.twist.linear.y = vz * self.linear_scaling
+        twist.twist.linear.z = vy * self.linear_scaling
+        twist.twist.angular.x = -wx * self.angular_scaling
+        twist.twist.angular.y = wy * self.angular_scaling
+        twist.twist.angular.z = wz * self.angular_scaling
 
-        if not self.grey_value and twist.twist.linear.x != 0.0:
+        if not self.white_value and twist.twist.linear.x != 0.0:
             self.twist_pub.publish(twist)
 
         self.prev_pose = msg

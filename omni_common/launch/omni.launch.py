@@ -41,7 +41,7 @@ def generate_launch_description():
             parameters=[
                 {"robot_description": "phantom"},
                 {"publish_rate": 1000},
-                {"reference_frame": "/map"},
+                {"reference_frame": "map"},
                 {"units": "mm"}
             ]
         )

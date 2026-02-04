@@ -65,9 +65,9 @@ def generate_launch_description():
             name='static_transform_omni',
             output="screen",
             arguments=[
-                '1', '0', '0',  # XYZ
-                '0', '0', '0', '1',  # Quaternion (WXYZ)
-                'world', 'base'
+                '-1', '0', '0',  # XYZ
+                '0', '0', '0.707', '0.707',  # Quaternion (WXYZ)
+                'map', 'base'
             ]
         )
     ])

@@ -94,7 +94,7 @@ public:
     {
         node_ = node;
         node_->declare_parameter<std::string>("~omni_name", "phantom");
-        node_->declare_parameter<std::string>("~reference_frame", "/map");
+        node_->declare_parameter<std::string>("~reference_frame", "map");
         node_->declare_parameter<std::string>("~units", "mm");
         node_->declare_parameter<int>("~publish_rate", 1000);
         node_->get_parameter<std::string>("~omni_name", omni_name);
